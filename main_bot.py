@@ -77,7 +77,21 @@ async def main():
     scheduler.add_job(calculate_daily_interest, "cron", hour=0, minute=0)
     scheduler.start()
     logging.basicConfig(level=logging.INFO)
+    
+    import os
+    from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+    from aiohttp import web
+    
+    app = web.Application()
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 10000)))
+    await site.start()
+    
     await dp.start_polling(bot)
+
+
 
 if __name__ == "__main__":
     asyncio.run(main())
