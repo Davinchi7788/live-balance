@@ -18,7 +18,8 @@ CRYPTO_TOKEN = "636509:AAtznSvL2z8ia8xsOwgM9ENA0RAryY3EIs3"
 USDT_RATE = 400.0          # 1 USDT = 400 AMD
 DAILY_INTEREST = 0.01      # Օրական 1% աճ
 REFERRAL_REG_BONUS = 60.0  # +60 ֏ ամեն հրավիրած անդամի համար
-WEB_APP_URL = "https://github.io"
+WEB_APP_URL = "https://https://github.io"
+
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
