@@ -10,7 +10,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, Inlin
 from aiocryptopay import AioCryptoPay, Networks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ
+# 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ (Ամեն ինչ լրացված է Ձեր տվյալներով)
 TELEGRAM_TOKEN = "8856804681:AAFxu6Cs-t5VoW41XbHJkU4NbXp4JJYIdZY"
 CRYPTO_TOKEN = "636509:AAtznSvL2z8ia8xsOwgM9ENA0RAryY3EIs3"
 USDT_RATE = 400.0          # 1 USDT = 400 AMD
@@ -112,7 +112,7 @@ async def withdraw_start(message: types.Message, state: FSMContext):
 @dp.message(WithdrawState.waiting_for_amount)
 async def withdraw_amount(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("⚠️ Խնդրում եմ գրեք միայն թիվ (օրինակ՝ 400)․")
+        await message.answer("⚠️ Խնဒրում եմ գրեք միայն թիվ (օրինակ՝ 400)․")
         return
     amount = float(message.text)
     data = await state.get_data()
