@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AMD Capital - Իմ Բալանսը</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        body {
+            background-color: #111116;
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            padding: 40px 15px;
+            margin: 0;
+        }
+        .balance-card {
+            background: linear-gradient(135deg, #1f4037, #99f2c8);
+            border-radius: 25px;
+            padding: 35px 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+            display: inline-block;
+            width: 90%;
+            max-width: 340px;
+            margin-top: 20px;
+        }
+        h2 { font-size: 16px; color: #e0e0e0; text-transform: uppercase; letter-spacing: 1px; margin: 0; }
+        .balance {
+            font-size: 42px;
+            font-weight: bold;
+            color: #ffffff;
+            margin: 20px 0;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .currency { color: #ffffff; font-size: 32px; margin-left: 5px; }
+        .hint { color: #8a8a93; font-size: 13px; margin-top: 25px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+    <div class="balance-card">
+        <h2>Ընթացիկ Հաշվեկշիռ (Live)</h2>
+        <!-- Այստեղ դրամը վայրկյան առ վայրկյան աճում է -->
+        <div class="balance" id="balance-text">1000.0000 <span class="currency">֏</span></div>
+    </div>
+
+    <p class="hint">📈 Ձեր կապիտալը ավտոմատ աճում է օրական 1% արագությամբ (բարդ տոկոսի մոդելով)։</p>
+
+    <script>
+        // Ենթադրենք օգտատերը հաշվին ունի 1,000 դրամ (հետագայում սա կմիացնենք իրական բազային)
+        let currentBalance = 1000.0000;
+        
+        # Օրական 1% տոկոսը բաժանած օրվա վայրկյանների վրա (86,400 վայրկյան)
+        let interestPerSecond = 0.01 / 86400;
+
+        function updateBalance() {
+            // Ամեն վայրկյան բալանսին ավելանում է տոկոսը
+            currentBalance += currentBalance * interestPerSecond;
+            
+            // Ցուցադրում ենք էկրանին 4 նիշով՝ աճի էֆեկտը գեղեցիկ երևալու համար
+            document.getElementById('balance-text').innerHTML = currentBalance.toFixed(4) + " <span class='currency'>֏</span>";
+        }
+
+        // Աշխատեցնում ենք ֆունկցիան ամեն 1 վայրկյանը մեկ
+        setInterval(updateBalance, 1000);
+        
+        // Տելեգրամի համակարգի սկզբնավորում
+        window.Telegram.WebApp.ready();
+    </script>
+</body>
+</html>
