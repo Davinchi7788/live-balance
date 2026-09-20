@@ -13,17 +13,20 @@ from aiocryptopay import AioCryptoPay, Networks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ
-TELEGRAM_TOKEN = "8856804681:AAFxu6Cs-t5VoW41XbHJkU4NbXp4JJYIdZY" # Ձեր իրական տոկենը
+TELEGRAM_TOKEN = "8856804681:AAFxu6Cs-t5VoW41XbHJkU4NbXp4JJYIdZY" # Ձեր տոկենը
 CRYPTO_TOKEN = "636509:AAtznSvL2z8ia8xsOwgM9ENA0RAryY3EIs3"
 USDT_RATE = 400.0          # 1 USDT = 400 AMD
 DAILY_INTEREST = 0.01      # Օրական 1% աճ
 REFERRAL_REG_BONUS = 60.0  # +60 ֏ ամեն հրավիրած անդամի համար
 WEB_APP_URL = "https://github.io"
 
+# Բոտի և դիսպետչերի սկզբնականացումն անում ենք առանց loop խախտելու
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
-crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+
+# CryptoPay օբյեկտը կստեղծվի main-ի ներսում, որպեսզի loop-ի սխալ չտա
+crypto = None
 
 class WithdrawState(StatesGroup):
     waiting_for_amount = State()
@@ -72,6 +75,7 @@ async def referral_menu(message: types.Message):
 # 📥 ԱՎՏՈՄԱՏ ԼԻՑՔԱՎՈՐՈՒՄ
 @dp.message(lambda message: message.text == "📥 Ավտոմատ Լիցքավորում")
 async def deposit_cmd(message: types.Message):
+    global crypto
     await message.answer("💡 Լիցքավորման նվազագույն չափը **1 USDT (400 ֏)** է։\nՍեղմեք ստորև գտնվող կոճակը վճարման հաշիվ ստեղծելու համար․")
     invoice = await crypto.create_invoice(asset='USDT', amount=1.0)
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -82,6 +86,7 @@ async def deposit_cmd(message: types.Message):
 
 @dp.callback_query(lambda c: c.data.startswith("check_"))
 async def check_invoice_callback(callback: types.CallbackQuery):
+    global crypto
     invoice_id = int(callback.data.split("_")[1])
     invoices = await crypto.get_invoices(invoice_ids=invoice_id)
     if invoices and invoices.status == 'paid':
@@ -123,6 +128,7 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
 
 @dp.message(WithdrawState.waiting_for_address)
 async def withdraw_address(message: types.Message, state: FSMContext):
+    global crypto
     address = message.text.strip()
     if not address.isdigit():
         await message.answer("⚠️ Խնդրում եմ գրեք Ձեր թվային Telegram ID-ն:")
@@ -140,7 +146,7 @@ async def withdraw_address(message: types.Message, state: FSMContext):
             conn.commit()
             await message.answer(f"✅ Կանխիկացումը հաջողվեց։ **{amount_usdt:.2f} USDT ({amount_amd:.0f} ֏)** ավտոմատ ուղարկվեց Ձեր հաշվին։")
     except Exception as e:
-        await message.answer("⚠️ Ավտոմատ փոխանցման սխալ։ Հնարավոր է սերվերի բալանսը դատարկ է։ Կապնվեք ադմինի հետ։")
+        await message.answer("⚠️ Ավտոմատ փոխանցման սխալ։ Կապնվեք ադմինի հետ։")
 
 @dp.message(lambda message: message.text == "📊 Պայմաններ")
 async def show_rules(message: types.Message):
@@ -159,10 +165,13 @@ async def on_startup():
     scheduler.add_job(calculate_daily_interest, "cron", hour=0, minute=0)
     scheduler.start()
 
-def main():
+async def main_async():
+    global crypto
     logging.basicConfig(level=logging.INFO)
     
-    # Ճիշտ Webhook և Aiohttp գործարկում Render-ի համար
+    # Ստեղծում ենք CryptoPay օբյեկտը արդեն ակտիվ loop-ի ներսում
+    crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+    
     app = web.Application()
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
     setup_application(app, dp, bot=bot)
@@ -170,7 +179,14 @@ def main():
     dp.startup.register(on_startup)
     
     port = int(os.environ.get("PORT", 10000))
-    web.run_app(app, host="0.0.0.0", port=port)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    
+    # Պահում ենք բոտը ակտիվ վիճակում
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main_async())
