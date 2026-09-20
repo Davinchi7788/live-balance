@@ -9,7 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
-from aiocryptopay import CryptoPay, Networks
+from aiocryptopay import AioCryptoPay, Networks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ (Ամեն ինչ արդեն լրացված է Ձեր տվյալներով)
@@ -24,7 +24,7 @@ WEB_APP_URL = "https://https://github.io"
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
-crypto = CryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
 
 class WithdrawState(StatesGroup):
     waiting_for_amount = State()
