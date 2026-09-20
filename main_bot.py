@@ -7,19 +7,18 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.webhook.aiohttp_server import SimpleRequestHandler
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
 from aiocryptopay import AioCryptoPay, Networks
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-# 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ (Ամեն ինչ արդեն լրացված է Ձեր տվյալներով)
-TELEGRAM_TOKEN = "8856804681:AAFxu6Cs-t5VoW41XbHJkU4NbXp4JJYIdZY" # Ձեր BotFather-ի տոկենը կթարմացվի Render-ում
+# 🔥 1. ԿԱՐԳԱՎՈՐՈՒՄՆԵՐ
+TELEGRAM_TOKEN = "8856804681:AAFxu6Cs-t5VoW41XbHJkU4NbXp4JJYIdZY" # Ձեր իրական տոկենը
 CRYPTO_TOKEN = "636509:AAtznSvL2z8ia8xsOwgM9ENA0RAryY3EIs3"
 USDT_RATE = 400.0          # 1 USDT = 400 AMD
 DAILY_INTEREST = 0.01      # Օրական 1% աճ
 REFERRAL_REG_BONUS = 60.0  # +60 ֏ ամեն հրավիրած անդամի համար
-WEB_APP_URL = "https://https://github.io"
-
+WEB_APP_URL = "https://github.io"
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
@@ -51,7 +50,7 @@ async def start_cmd(message: types.Message):
     args = message.text.split()
     cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
     if not cursor.fetchone():
-        referrer_id = int(args[1]) if len(args) > 1 and args[1].isdigit() and int(args[1]) != user_id else None
+        referrer_id = int(args) if len(args) > 1 and args.isdigit() and int(args) != user_id else None
         cursor.execute("INSERT INTO users (user_id, balance, referrer_id) VALUES (?, ?, ?)", (user_id, 0.0, referrer_id))
         conn.commit()
         if referrer_id:
@@ -67,14 +66,14 @@ async def referral_menu(message: types.Message):
     bot_info = await bot.get_me()
     ref_link = f"https://t.me{bot_info.username}?start={user_id}"
     cursor.execute("SELECT COUNT(*) FROM users WHERE referrer_id = ?", (user_id,))
-    ref_count = cursor.fetchone()[0]
+    ref_count = cursor.fetchone()
     await message.answer(f"👥 **Ռեֆերալային համակարգ**\n\n🎁 Բոնուս գրանցման համար՝ **+{REFERRAL_REG_BONUS:.0f} ֏** տեղում:\n🔗 Ձեր հղումը՝\n`{ref_link}`\n\n📊 Հրավիրված անդամներ՝ **{ref_count} հոգի**", parse_mode="Markdown")
 
-# 📥 ԱՎՏՈՄԱՏ ԼԻՑՔԱՎՈՐՈՒՄ (USDT -> AMD)
+# 📥 ԱՎՏՈՄԱՏ ԼԻՑՔԱՎՈՐՈՒՄ
 @dp.message(lambda message: message.text == "📥 Ավտոմատ Լիցքավորում")
 async def deposit_cmd(message: types.Message):
     await message.answer("💡 Լիցքավորման նվազագույն չափը **1 USDT (400 ֏)** է։\nՍեղմեք ստորև գտնվող կոճակը վճարման հաշիվ ստեղծելու համար․")
-    invoice = await crypto.create_invoice(asset='USDT', amount=1.0) # Ստեղծում ենք թեստային 1 USDT հաշիվ
+    invoice = await crypto.create_invoice(asset='USDT', amount=1.0)
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 Վճարել `@CryptoBot`-ով", url=invoice.pay_url)],
         [InlineKeyboardButton(text="🔄 Ստուգել Վճարումը", callback_data=f"check_{invoice.invoice_id}")]
@@ -85,16 +84,16 @@ async def deposit_cmd(message: types.Message):
 async def check_invoice_callback(callback: types.CallbackQuery):
     invoice_id = int(callback.data.split("_")[1])
     invoices = await crypto.get_invoices(invoice_ids=invoice_id)
-    if invoices and invoices[0].status == 'paid':
+    if invoices and invoices.status == 'paid':
         user_id = callback.from_user.id
-        amd_amount = float(invoices[0].amount) * USDT_RATE
+        amd_amount = float(invoices.amount) * USDT_RATE
         cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amd_amount, user_id))
         conn.commit()
         await callback.message.answer(f"✅ Վճարումը հաստատվեց։ Ձեր հաշվեկշռին ավելացավ **+{amd_amount:.0f} ֏**")
     else:
         await callback.answer("❌ Վճարումը դեռ չի կատարվել։", show_alert=True)
 
-# 💸 ԱՎՏՈՄԱՏ ԿԱՆԽԻԿԱՑՈՒՄ (AMD -> USDT)
+# 💸 ԱՎՏՈՄԱՏ ԿԱՆԽԻԿԱՑՈՒՄ
 @dp.message(lambda message: message.text == "💸 Ավտոմատ Կանխիկացում")
 async def withdraw_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -119,28 +118,29 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Գումարը սխալ է կամ գերազանցում է Ձեր բալանսը։")
         return
     await state.update_data(withdraw_amount=amount)
-    await message.answer("📬 Այժմ ուղարկեք Ձեր **USDT (TRC-20 կամ TON)** դրամապանակի հասցեն `@CryptoBot`-ից․")
+    await message.answer("📬 Այժմ ուղարկեք Ձեր **Տելեգրամի ID-ն** `@CryptoBot`-ից գումարը ստանալու համար․")
     await state.set_state(WithdrawState.waiting_for_address)
 
 @dp.message(WithdrawState.waiting_for_address)
 async def withdraw_address(message: types.Message, state: FSMContext):
     address = message.text.strip()
+    if not address.isdigit():
+        await message.answer("⚠️ Խնդրում եմ գրեք Ձեր թվային Telegram ID-ն:")
+        return
     data = await state.get_data()
     amount_amd = data['withdraw_amount']
     amount_usdt = amount_amd / USDT_RATE
     user_id = message.from_user.id
     await state.clear()
     
-    # Ավտոմատ փոխանցում Crypto Pay API-ով
     try:
-        # Փորձում ենք կատարել ավտոմատ ելքը սերվերով
-        transfer = await crypto.transfer(user_id=user_id, asset='USDT', amount=amount_usdt, spend_id=os.urandom(8).hex())
+        transfer = await crypto.transfer(user_id=int(address), asset='USDT', amount=amount_usdt, spend_id=os.urandom(8).hex())
         if transfer:
             cursor.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (amount_amd, user_id))
             conn.commit()
-            await message.answer(f"✅ Կանխիկացումը հաջողվեց։ **{amount_usdt:.2f} USDT ({amount_amd:.0f} ֏)** ավտոմատ ուղարկվեց Ձեր դրամապանակին։")
+            await message.answer(f"✅ Կանխիկացումը հաջողվեց։ **{amount_usdt:.2f} USDT ({amount_amd:.0f} ֏)** ավտոմատ ուղարկվեց Ձեր հաշվին։")
     except Exception as e:
-        await message.answer("⚠️ Ավտոմատ փոխանցման սխալ։ Հնարավոր է սերվերի բալանսը դատարկ է կամ հասցեն սխալ է։ Կապնվեք ադմինի հետ։")
+        await message.answer("⚠️ Ավտոմատ փոխանցման սխալ։ Հնարավոր է սերվերի բալանսը դատարկ է։ Կապնվեք ադմինի հետ։")
 
 @dp.message(lambda message: message.text == "📊 Պայմաններ")
 async def show_rules(message: types.Message):
@@ -155,18 +155,22 @@ async def calculate_daily_interest():
         try: await bot.send_message(user_id, f"🎉 Ձեր օրական տոկոսը ավելացավ: +{bonus:.2f} ֏:")
         except: pass
 
-async def main():
+async def on_startup():
     scheduler.add_job(calculate_daily_interest, "cron", hour=0, minute=0)
     scheduler.start()
+
+def main():
     logging.basicConfig(level=logging.INFO)
-    import os
+    
+    # Ճիշտ Webhook և Aiohttp գործարկում Render-ի համար
     app = web.Application()
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path="/webhook")
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 10000)))
-    await site.start()
-    await dp.start_polling(bot)
+    setup_application(app, dp, bot=bot)
+    
+    dp.startup.register(on_startup)
+    
+    port = int(os.environ.get("PORT", 10000))
+    web.run_app(app, host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
