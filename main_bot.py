@@ -21,7 +21,9 @@ WEB_APP_URL = "https://github.io"
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher()
 scheduler = AsyncIOScheduler()
-crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+
+# Օբյեկտը թողնում ենք դատարկ, որ loop-ի սխալ չտա
+crypto = None
 
 class WithdrawState(StatesGroup):
     waiting_for_amount = State()
@@ -70,6 +72,7 @@ async def referral_menu(message: types.Message):
 # 📥 ԱՎՏՈՄԱՏ ԼԻՑՔԱՎՈՐՈՒՄ
 @dp.message(lambda message: message.text == "📥 Ավտոմատ Լիցքավորում")
 async def deposit_cmd(message: types.Message):
+    global crypto
     await message.answer("💡 Լիցքավորման նվազագույն չափը **1 USDT (400 ֏)** է։\nՍեղմեք ստորև գտնվող կոճակը վճարման հաշիվ ստեղծելու համար․")
     invoice = await crypto.create_invoice(asset='USDT', amount=1.0)
     kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -80,6 +83,7 @@ async def deposit_cmd(message: types.Message):
 
 @dp.callback_query(lambda c: c.data.startswith("check_"))
 async def check_invoice_callback(callback: types.CallbackQuery):
+    global crypto
     invoice_id = int(callback.data.split("_")[-1])
     invoices = await crypto.get_invoices(invoice_ids=invoice_id)
     if invoices and invoices.status == 'paid':
@@ -97,7 +101,7 @@ async def withdraw_start(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     cursor.execute("SELECT balance FROM users WHERE user_id = ?", (user_id,))
     res = cursor.fetchone()
-    balance = res[0] if res else 0.0
+    balance = res if res else 0.0
     if balance < 400:
         await message.answer("⚠️ Կանխիկացման նվազագույն գումարը **400 ֏ (1 USDT)** է։")
         return
@@ -121,6 +125,7 @@ async def withdraw_amount(message: types.Message, state: FSMContext):
 
 @dp.message(WithdrawState.waiting_for_address)
 async def withdraw_address(message: types.Message, state: FSMContext):
+    global crypto
     address = message.text.strip()
     if not address.isdigit():
         await message.answer("⚠️ Խնդրում եմ գրեք Ձեր թվային Telegram ID-ն:")
@@ -154,11 +159,15 @@ async def calculate_daily_interest():
         except: pass
 
 async def main():
+    global crypto
     logging.basicConfig(level=logging.INFO)
+    
+    # Այստեղ ենք ստեղծում crypto օբյեկտը, որ loop-ի սխալ չտա
+    crypto = AioCryptoPay(token=CRYPTO_TOKEN, network=Networks.MAIN_NET)
+    
     scheduler.add_job(calculate_daily_interest, "cron", hour=0, minute=0)
     scheduler.start()
     
-    # Մաքրում ենք հին վեբհուկը ու միացնում մաքուր polling-ը
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
